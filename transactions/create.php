@@ -1,39 +1,34 @@
 <?php
 require_once '../includes/database.php';
+session_start();
 
-// Get clients, employees, and items for dropdowns
 $clients = $conn->query("SELECT * FROM Client ORDER BY client_id");
 $employees = $conn->query("SELECT * FROM Employee ORDER BY employee_id");
 $items = $conn->query("SELECT * FROM Rental_Item WHERE total_stock > 0");
 
 $cart = $_SESSION['cart'] ?? [];
-session_start();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['add_to_cart'])) {
-        // Add item to cart
         $item_id = $_POST['item_id'];
         $quantity = $_POST['quantity'];
-        $cart[$item_id] = $quantity;
+        $cart[$item_id] = ($cart[$item_id] ?? 0) + $quantity;
         $_SESSION['cart'] = $cart;
+        header("Location: create.php");
+        exit();
     } elseif (isset($_POST['checkout'])) {
-        // Create transaction
         $transaction_id = generateId('T', 'TransactionTbl', 'transaction_id');
         $client_id = $_POST['client_id'];
         $employee_id = $_POST['employee_id'];
         $start_date = $_POST['start_date'];
         $return_date = $_POST['return_date'];
         
-        $sql = "INSERT INTO TransactionTbl (transaction_id, client_id, employee_id, transaction_date, start_date, return_date) 
-                VALUES (?, ?, ?, CURDATE(), ?, ?)";
-        $stmt = $conn->prepare($sql);
+        $stmt = $conn->prepare("INSERT INTO TransactionTbl (transaction_id, client_id, employee_id, transaction_date, start_date, return_date) VALUES (?, ?, ?, CURDATE(), ?, ?)");
         $stmt->bind_param("sssss", $transaction_id, $client_id, $employee_id, $start_date, $return_date);
         
         if ($stmt->execute()) {
-            // Add items to transaction
             foreach ($cart as $item_id => $quantity) {
-                $conn->query("INSERT INTO Transaction_Item (transaction_id, item_id, quantity) 
-                             VALUES ('$transaction_id', '$item_id', $quantity)");
+                $conn->query("INSERT INTO Transaction_Item (transaction_id, item_id, quantity) VALUES ('$transaction_id', '$item_id', $quantity)");
             }
             unset($_SESSION['cart']);
             header("Location: view.php?id=$transaction_id");
@@ -41,41 +36,188 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Calculate total
+$total = 0;
+$cartItems = [];
+foreach ($cart as $item_id => $qty) {
+    $item = $conn->query("SELECT * FROM Rental_Item WHERE item_id = '$item_id'")->fetch_assoc();
+    if ($item) {
+        $cartItems[] = ['item' => $item, 'qty' => $qty];
+        $total += $item['individual_cost'] * $qty;
+    }
+}
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>New Transaction</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>New Rental Transaction - Table & Chair Rental</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Poppins', sans-serif; }
+        body { background: #f0f2f5; padding: 20px; }
+        
+        .page-header {
+            background: white;
+            border-radius: 16px;
+            padding: 20px 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+        }
+        
+        .transaction-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            height: 100%;
+        }
+        
+        .cart-card {
+            background: white;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            height: 100%;
+            position: sticky;
+            top: 20px;
+        }
+        
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-control, .form-select {
+            border-radius: 12px;
+            border: 2px solid #e5e7eb;
+            padding: 12px 16px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+            outline: none;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 24px;
+            font-weight: 600;
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            border-radius: 12px;
+            padding: 14px;
+            font-weight: 600;
+            width: 100%;
+        }
+        
+        .cart-item {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        
+        .cart-item:hover {
+            background: #eef2ff;
+            transform: translateX(5px);
+        }
+        
+        .total-amount {
+            font-size: 28px;
+            font-weight: 700;
+            color: #667eea;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .empty-cart {
+            text-align: center;
+            padding: 40px;
+            color: #9ca3af;
+        }
+        
+        .btn-remove {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 5px 12px;
+            font-size: 12px;
+        }
+        
+        .btn-remove:hover {
+            background: #dc2626;
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <h2><i class="fas fa-shopping-cart"></i> New Rental Transaction</h2>
+    <div class="container-fluid">
+        <!-- Header -->
+        <div class="page-header">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="mb-1" style="font-weight: 700;"><i class="fas fa-shopping-cart text-primary"></i> New Rental Transaction</h2>
+                    <p class="text-muted mb-0">Create a new rental order for your customer</p>
+                </div>
+                <a href="../index.php" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
         
         <div class="row">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-primary text-white">
-                        <h5>Transaction Details</h5>
-                    </div>
-                    <div class="card-body">
-                        <form method="POST">
-                            <div class="mb-3">
-                                <label>Client</label>
-                                <select name="client_id" class="form-control" required>
+            <!-- Left Column - Transaction Details -->
+            <div class="col-lg-7">
+                <div class="transaction-card">
+                    <h5 class="section-title">
+                        <i class="fas fa-file-alt text-primary"></i> Transaction Details
+                    </h5>
+                    
+                    <form method="POST" id="transactionForm">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-user"></i> CLIENT
+                                </label>
+                                <select name="client_id" class="form-select" required>
                                     <option value="">Select Client</option>
                                     <?php while($c = $clients->fetch_assoc()): ?>
                                         <option value="<?= $c['client_id'] ?>">
-                                            <?= $c['first_name'] . ' ' . $c['last_name'] ?>
+                                            <?= $c['first_name'] . ' ' . $c['last_name'] ?> (<?= $c['client_id'] ?>)
                                         </option>
                                     <?php endwhile; ?>
                                 </select>
                             </div>
-                            <div class="mb-3">
-                                <label>Employee</label>
-                                <select name="employee_id" class="form-control" required>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-user-tie"></i> EMPLOYEE (HANDLED BY)
+                                </label>
+                                <select name="employee_id" class="form-select" required>
                                     <option value="">Select Employee</option>
                                     <?php while($e = $employees->fetch_assoc()): ?>
                                         <option value="<?= $e['employee_id'] ?>">
@@ -84,84 +226,134 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     <?php endwhile; ?>
                                 </select>
                             </div>
-                            <div class="mb-3">
-                                <label>Start Date</label>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-calendar-alt"></i> RENTAL START DATE
+                                </label>
                                 <input type="date" name="start_date" class="form-control" required>
                             </div>
-                            <div class="mb-3">
-                                <label>Return Date</label>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">
+                                    <i class="fas fa-calendar-check"></i> RETURN DATE
+                                </label>
                                 <input type="date" name="return_date" class="form-control" required>
                             </div>
-                    </div>
+                        </div>
+                        
+                        <div class="mt-4">
+                            <h5 class="section-title">
+                                <i class="fas fa-plus-circle text-success"></i> Add Items to Cart
+                            </h5>
+                            <div class="row">
+                                <div class="col-md-7">
+                                    <select id="itemSelect" class="form-select">
+                                        <option value="">Select Item</option>
+                                        <?php 
+                                        $items = $conn->query("SELECT * FROM Rental_Item WHERE total_stock > 0");
+                                        while($i = $items->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?= $i['item_id'] ?>" data-cost="<?= $i['individual_cost'] ?>">
+                                                <?= $i['item_name'] ?> - ₱<?= number_format($i['individual_cost'], 2) ?>/day
+                                            </option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <input type="number" id="quantity" class="form-control" placeholder="Qty" value="1" min="1">
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="button" class="btn btn-primary w-100" onclick="addToCart()">
+                                        <i class="fas fa-cart-plus"></i> Add
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
                 </div>
             </div>
             
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header bg-success text-white">
-                        <h5>Add Items to Cart</h5>
+            <!-- Right Column - Shopping Cart -->
+            <div class="col-lg-5">
+                <div class="cart-card">
+                    <h5 class="section-title">
+                        <i class="fas fa-shopping-cart text-warning"></i> Shopping Cart
+                    </h5>
+                    
+                    <div id="cartItemsList">
+                        <?php if(empty($cartItems)): ?>
+                            <div class="empty-cart">
+                                <i class="fas fa-shopping-basket fa-3x mb-3"></i>
+                                <p>Cart is empty</p>
+                                <small>Add items from the left panel</small>
+                            </div>
+                        <?php else: ?>
+                            <?php foreach($cartItems as $item): ?>
+                                <div class="cart-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong><?= $item['item']['item_name'] ?></strong><br>
+                                            <small>₱<?= number_format($item['item']['individual_cost'], 2) ?> x <?= $item['qty'] ?></small>
+                                        </div>
+                                        <div>
+                                            <strong class="text-primary">₱<?= number_format($item['item']['individual_cost'] * $item['qty'], 2) ?></strong>
+                                            <button class="btn-remove ms-2" onclick="removeItem('<?= $item['item']['item_id'] ?>')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label>Select Item</label>
-                            <select id="item_id" class="form-control">
-                                <option value="">Choose Item</option>
-                                <?php while($i = $items->fetch_assoc()): ?>
-                                    <option value="<?= $i['item_id'] ?>" data-cost="<?= $i['individual_cost'] ?>">
-                                        <?= $i['item_name'] ?> - ₱<?= $i['individual_cost'] ?>/day
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label>Quantity</label>
-                            <input type="number" id="quantity" class="form-control" min="1" value="1">
-                        </div>
-                        <button type="button" onclick="addToCart()" class="btn btn-primary">Add to Cart</button>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <strong>Estimated Total:</strong>
+                        <span class="total-amount">₱<?= number_format($total, 2) ?></span>
                     </div>
-                </div>
-                
-                <div class="card mt-3">
-                    <div class="card-header bg-warning">
-                        <h5>Shopping Cart</h5>
-                    </div>
-                    <div class="card-body">
-                        <div id="cartItems"></div>
-                        <hr>
-                        <button type="submit" name="checkout" class="btn btn-success w-100">Complete Transaction</button>
-                        </form>
-                    </div>
+                    
+                    <button type="submit" form="transactionForm" name="checkout" class="btn btn-success" <?= empty($cartItems) ? 'disabled' : '' ?>>
+                        <i class="fas fa-check-circle"></i> Complete Transaction
+                    </button>
                 </div>
             </div>
         </div>
     </div>
     
     <script>
-    let cart = [];
-    
-    function addToCart() {
-        let itemSelect = document.getElementById('item_id');
-        let itemId = itemSelect.value;
-        let itemName = itemSelect.options[itemSelect.selectedIndex].text;
-        let quantity = document.getElementById('quantity').value;
-        
-        if (!itemId) {
-            alert('Please select an item');
-            return;
+        function addToCart() {
+            let select = document.getElementById('itemSelect');
+            let itemId = select.value;
+            let quantity = document.getElementById('quantity').value;
+            
+            if(!itemId) {
+                alert('Please select an item');
+                return;
+            }
+            
+            let form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="item_id" value="${itemId}">
+                <input type="hidden" name="quantity" value="${quantity}">
+                <input type="hidden" name="add_to_cart" value="1">
+            `;
+            document.body.appendChild(form);
+            form.submit();
         }
         
-        cart.push({id: itemId, name: itemName, qty: quantity});
-        displayCart();
-    }
-    
-    function displayCart() {
-        let html = '<table class="table table-sm">';
-        cart.forEach(item => {
-            html += `<tr><td>${item.name}</td><td>x${item.qty}</td></tr>`;
-        });
-        html += '</table>';
-        document.getElementById('cartItems').innerHTML = html;
-    }
+        function removeItem(itemId) {
+            let form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="remove_item" value="${itemId}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
     </script>
 </body>
 </html>

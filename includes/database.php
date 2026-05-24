@@ -4,74 +4,18 @@ $user = 'root';
 $password = '';
 $database = 'rental_db';
 
-// First connect without database
+// Connect to MySQL server first
 $conn = new mysqli($host, $user, $password);
 
-// Check connection
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-// Create database if it doesn't exist
-$sql = "CREATE DATABASE IF NOT EXISTS $database";
-if ($conn->query($sql) === TRUE) {
-    // Database created or already exists
-} else {
-    die("Error creating database: " . $conn->error);
-}
+// Create database if not exists
+$conn->query("CREATE DATABASE IF NOT EXISTS $database");
 
-// Now select the database
+// Select the database
 $conn->select_db($database);
-
-// Create tables if they don't exist
-$tables = [
-    "CREATE TABLE IF NOT EXISTS Client (
-        client_id CHAR(6) PRIMARY KEY,
-        first_name VARCHAR(25) NOT NULL,
-        last_name VARCHAR(25) NOT NULL,
-        contact VARCHAR(30) NOT NULL,
-        location VARCHAR(50)
-    )",
-    
-    "CREATE TABLE IF NOT EXISTS Employee (
-        employee_id CHAR(6) PRIMARY KEY,
-        first_name VARCHAR(25) NOT NULL,
-        last_name VARCHAR(25) NOT NULL,
-        wage INTEGER
-    )",
-    
-    "CREATE TABLE IF NOT EXISTS Item_Type (
-        item_type_id CHAR(3) PRIMARY KEY,
-        type_name VARCHAR(20)
-    )",
-    
-    "CREATE TABLE IF NOT EXISTS Rental_Item (
-        item_id CHAR(6) PRIMARY KEY,
-        item_name VARCHAR(25),
-        item_type_id CHAR(3),
-        individual_cost INTEGER,
-        total_stock INTEGER,
-        FOREIGN KEY (item_type_id) REFERENCES Item_Type(item_type_id)
-    )"
-];
-
-foreach ($tables as $table) {
-    if ($conn->query($table) !== TRUE) {
-        // Table might already exist, continue
-    }
-}
-
-// Insert default item types if empty
-$check = $conn->query("SELECT COUNT(*) as count FROM Item_Type");
-$row = $check->fetch_assoc();
-if ($row['count'] == 0) {
-    $conn->query("INSERT INTO Item_Type VALUES 
-        ('001', 'Electronics'),
-        ('002', 'Furniture'),
-        ('003', 'Tools'),
-        ('004', 'Vehicles'),
-        ('005', 'Appliances')");
-}
 
 // Set charset
 $conn->set_charset("utf8");
