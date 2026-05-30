@@ -141,7 +141,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: white;
             transform: translateX(-3px);
         }
-        /* ======================================== */
         
         .alert {
             border-radius: 12px;
