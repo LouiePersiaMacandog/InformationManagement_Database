@@ -1,13 +1,21 @@
 <?php
 require_once '../includes/database.php';
-header('Content-Type: application/json');
 
-$client_id = $_POST['client_id'];
-$sql = "DELETE FROM Client WHERE client_id='$client_id'";
+// Get client_id from URL (GET method)
+$client_id = isset($_GET['id']) ? $_GET['id'] : '';
 
-if ($conn->query($sql)) {
-    echo json_encode(['success' => true]);
+if ($client_id) {
+    // Delete the client
+    $sql = "DELETE FROM Client WHERE client_id = '$client_id'";
+    if ($conn->query($sql)) {
+        header("Location: list.php?success=Client deleted successfully");
+        exit();
+    } else {
+        header("Location: list.php?error=Failed to delete client");
+        exit();
+    }
 } else {
-    echo json_encode(['success' => false, 'error' => $conn->error]);
+    header("Location: list.php?error=No client selected");
+    exit();
 }
 ?>
