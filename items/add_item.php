@@ -121,9 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: white;
         }
         
-        /* ======================================== */
-        /* BACK TO INVENTORY BUTTON                 */
-        /* ======================================== */
         .btn-back {
             background: #6b7280;
             color: white;
@@ -219,10 +216,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 </div>
             </form>
             
-            <!-- ============================================= -->
-            <!-- BACK TO INVENTORY BUTTON                       -->
-            <!-- This takes you back to the inventory list      -->
-            <!-- ============================================= -->
             <div class="action-buttons">
                 <a href="manage.php" class="btn-back">
                     <i class="fas fa-arrow-left"></i> Back to Inventory
