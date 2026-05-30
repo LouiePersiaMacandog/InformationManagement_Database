@@ -131,12 +131,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-back {
             background: #6b7280;
             color: white;
-            padding: 10px 24px;
-            border-radius: 12px;
+            padding: 10px 3px;
+            border-radius: 6px;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
+            gap: 5px;
             margin-top: 20px;
             transition: all 0.3s;
             border: none;
